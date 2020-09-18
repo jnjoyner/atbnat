@@ -1,0 +1,195 @@
+#!/usr/bin/ruby
+# This is makeOOPmobi
+# In this script, for the first time we make the CSS file and JAVASCRIPT file be in CONTENT directory
+#
+class Page
+  require 'erb'
+  Template = <<-END_OF_TEMPLATE
+  <!DOCTYPE html>
+  <html lang="en-US">
+  <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <%= title %>
+  <%= description %>
+  <%= robots %>
+  <%= stylesheet %>
+  <%= javascript %>
+  <%= js_sources %>
+  </head>
+  <body id="<%= @page.to_s %>">
+  <%= body( @page ) %>
+  </body>
+  </html>
+  END_OF_TEMPLATE
+  def initialize( page_name ) # a symbol
+    @page = page_name
+  end
+  def write_to_disk
+    template_to_use = Template unless template_to_use = Page_list[@page][:T]
+    fqfn = '../public/' + @page.to_s + '.html'
+    File.open( fqfn, 'w') do |fh|
+      fh.write( ERB.new( template_to_use ).result(binding) )
+      File.chmod( 0604, fqfn )
+    end
+  end
+  def content( filename = nil ) # Returns block of ERB'd html
+    if filename
+      fqfn = '../content/'  + filename.to_s + '.html'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      ERB.new( File.read( fqfn ) ).result(binding)
+    else
+      raise 'File name argument was not passed to "content" method, or was nil'
+    end
+  end
+  def title # Used in HEAD section
+    page_title = TITLE unless page_title = Page_list[@page][:t]
+    %{<title>\n#{page_title}\n</title>\n}
+  end
+  def description # Used in HEAD section
+    page_description = DESCRIPTION unless page_description = Page_list[@page][:d]
+    %{<meta name="description" content="#{ page_description }">}
+  end
+  def stylesheet # Used in HEAD section
+      fqfn = '../content/'  + DOMAIN + '.css'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      return "<style>\n" + File.read( fqfn ) + "\n</style>\n"
+  end
+  def javascript # Used in HEAD section
+      fqfn = '../content/'  + DOMAIN + '.js'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      return "<script>\n" + File.read( fqfn ) + "\n</script>\n"
+  end
+  def responsive_menu # Used in HEAD section
+    <<-End_of_scripts
+      <script src="http://cdn.jquerytools.org/1.2.6/full/jquery.tools.min.js"></script>
+      <script>
+        $(function() {
+          $("img[rel]").overlay();
+        });
+      </script>
+      <script>
+        jQuery(function($){
+           $( '.menu_btn' ).click(function(){
+           $('.responsive_menu').toggleClass('expand');
+           })
+        })
+      </script>
+    End_of_scripts
+  end
+  def js_sources # Used in HEAD section
+    sources = ''
+    JAVASCRIPT_SOURCES.each do |source|
+      sources += %{<script type="text/javascript" src="#{source.to_s}"></script>\n}
+    end
+    return sources
+  end
+  def robots # Used in HEAD section
+    %{<meta name="robots" content="index,follow">}
+  end
+  def aside
+    %{ <aside>\n#{content :aside}\n</aside>\n }
+  end
+  def header
+    %{<header>\n#{content :header}\n</header>\n}
+  end
+  def main( content )
+    %{ <main>\n#{ content }\n</main>\n }
+  end
+  def footer
+    %{ <footer>\n#{ (content :footer) + website_credit }\n</footer>\n }
+  end
+  def website_credit
+    "<p id='website_credit'
+    style=
+    'text-align: right;
+    margin-right: 1em;
+    font-size: 11pt;
+    font-family: sans-serif;
+    font-style: italic;
+    '>Website by Atascadero Web Design</p>"
+  end
+  def nav
+    %{ <nav id="main_navigation">\n#{content :main_nav}\n</nav>\n }
+  end
+  def nav_links( navigation_hash )
+    links = ''
+    navigation_hash.each do |html_file, display_name|
+      links += %{<a href="#{html_file.to_s}.html">#{display_name}</a>\n}
+    end
+    links
+  end
+  def single_link( html_file, display_text)
+    link = %{<a href="#{html_file.to_s}.html">#{display_text}</a>\n}
+  end
+  def announce( content )
+    %{ <p class="announce1">\n#{content}\n</p>\n }
+  end
+  def photo( content )
+    %{ <img src="img/#{content}.jpg" class="#{content}">\n }
+  end
+  def masthead # The one and only Big Header for the page
+    %{ <header id="masthead">\n#{content :masthead}\n</header>\n }
+  end
+  def section( section_name ) #section/article name is a symbol
+    %{ <section id="#{section_name}">\n#{content section_name}\n</section>\n }
+  end
+  def article( article_name ) #section/article name is a symbol
+    %{ <article id="#{article_name}">\n#{content article_name}\n</article>\n }
+  end
+  def div( div_id )
+    %{<div id="#{div_id}">\n#{content div_id.to_sym}\n</div>\n}
+  end
+  def sidebar
+    %{<div id="sidebar">\n#{content :sidebar}\n</div>\n}
+  end
+  def gallery( dir )
+    # dir must end with slash
+    paragraph_set = ""
+    Dir.glob(%{../public/#{dir}*}).each do |file|
+      paragraph_set += %{<img src="#{dir}#{File.basename( file )}">}
+    end
+    return paragraph_set
+  end
+  def gallery_ordered( image_list, source_dir )
+    output = ""
+    image_list.split("\n").each do |image_name|
+      output += %{<img src="#{source_dir}#{image_name}">}
+      output += "\n"
+    end
+    return output
+  end
+
+# Below method in page.rb disabled -- see same method in individual project
+  def par_DISABLED( simple_list, id_attribute=nil, class_attribute=nil )
+    html = %{<p id="#{id_attribute}" class="#{class_attribute}">\n}
+    simple_list.split("\n").each do |item|
+      html << item.to_s + '</p>' + "\n"
+    end
+    html
+  end
+  
+  def ul( simple_list, id_attribute=nil, class_attribute=nil )
+    html = %{<ul id="#{id_attribute}" class="#{class_attribute}">\n}
+    simple_list.split("\n").each do |item|
+      html << '<li>' + item.to_s + '</li>' + "\n"
+    end
+    html << '</ul>'
+  end
+end
+
+begin
+  require Dir.pwd + '/site_specs'; include Site_specs
+  Site_specs::Page_list.each_key do |page_name|
+    p = Page.new( page_name )
+    p.write_to_disk
+  end
+rescue Exception => e
+  puts e.message << "\n" << e.backtrace.first
+end

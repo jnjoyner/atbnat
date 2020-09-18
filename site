@@ -1,0 +1,42 @@
+#!/usr/bin/ruby
+class Site
+  def self.content( filename = nil )
+    if filename
+      fqfn = '../content/'  + filename.to_s + '.html'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      ERB.new( File.read( fqfn ) ).result(binding)
+    else
+      raise 'File name argument was not passed to "content" method, or was nil'
+    end
+  end
+  def write_to_disk
+    fqfn = '../public/index.html'
+    File.open( fqfn, 'w') do |fh|
+      fh.write( ERB.new( Template_default ).result(binding) )
+      File.chmod( 0604, fqfn )
+    end
+  end
+  def self.header
+    %{ <header id="header">\n#{Site.content :header}\n</header>\n }
+  end
+  def self.nav
+    %{ <nav id="main_navigation">\n#{content :main_nav}\n</nav> }
+  end
+  def self.section( section_name ) #section_name is a symbol
+    %{ <section id="#{section_name}">\n#{content section_name}\n</section> }
+  end
+  def self.article( article_name )
+    %{ <article id="#{article_name}">\n#{content article_name}\n</article> }
+  end
+end
+
+begin
+  require 'erb'
+  require Dir.pwd + '/site_specs'
+  include Site_specs
+  Site.new.write_to_disk
+rescue Exception => e
+  puts e.message << "\n" << e.backtrace.first
+end

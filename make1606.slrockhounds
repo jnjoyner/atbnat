@@ -1,0 +1,117 @@
+#!/usr/bin/ruby
+module Make1606
+  def set_page(p)
+    @page_name = p
+  end
+  def get_page
+    @page_name
+  end
+  Template = <<-END_OF_TEMPLATE
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<%= title %>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<%= description %>
+<%= domain %>
+<%= responsive_menu_js %>
+</head>
+<body id="<%= get_page %>">
+<%= body( get_page ) %>
+</body>
+</html>
+END_OF_TEMPLATE
+  def content( filename = nil ) # Returns block of ERB'd html
+    if filename
+      fqfn = '../content/'  + filename.to_s + '.html'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      ERB.new( File.read( fqfn ) ).result(binding)
+    else
+      raise 'File name argument was not passed to "content" method, or was nil'
+    end
+  end
+  def write_to_disk( p )
+    set_page( p )
+    fqfn = '../public/' + p.to_s + '.html'
+    File.open( fqfn, 'w') do |fh|
+      fh.write( ERB.new( Template ).result(binding) ) #####################
+      File.chmod( 0604, fqfn )
+    end
+  end
+  def title # Used in HEAD section
+    page_title = TITLE unless page_title = Page_list[get_page][:t]
+    %{<title>\n#{page_title}\n</title>\n}
+  end
+  def description # Used in HEAD section
+    %{<meta name="description" content="#{ DESCRIPTION }" />\n}
+  end
+  def domain # Used in HEAD section
+    %{<link rel = "stylesheet" type = "text/css" href = "css/#{ DOMAIN }.css" />\n} +
+    %{<link rel = "stylesheet" type = "text/css" href = "css/responsive_menu.css" />\n} +
+    %{<script src="/js/#{ DOMAIN }.js"></script>}
+  end
+  def aside
+    %{ <aside>\n#{content :aside}\n</aside>\n }
+  end
+  def header
+    %{ <header>\n#{content :header}\n</header>\n }
+  end
+  def main( content )
+    %{ <main>\n#{ content }\n</main>\n }
+  end
+  def footer
+    %{ <footer>\n#{ content :footer }\n</footer>\n }
+  end
+  def nav
+    %{ <nav id="main_navigation">\n#{content :main_nav}\n</nav>\n }
+  end
+  def nav_links( navigation_hash )
+    links = ''
+    navigation_hash.each do |html_file, display_name|
+      links += %{<a href="/#{html_file.to_s}.html">#{display_name}</a>\n}
+    end
+    links
+  end
+  def announce( content )
+    %{ <p class="announce1">\n#{content}\n</p>\n }
+  end
+  def photo( content )
+    %{ <img src="img/#{content}.jpg" class="#{content}">\n }
+  end
+  def masthead # The one and only Big Header for the page
+    %{ <header id="masthead">\n#{content :masthead}\n</header>\n }
+  end
+  def section( section_name ) #section/article name is a symbol
+    %{ <section id="#{section_name}">\n#{content section_name}\n</section>\n }
+  end
+  def article( article_name ) #section/article name is a symbol
+    %{ <article id="#{article_name}">\n#{content article_name}\n</article>\n }
+  end
+  def ul( simple_list, id_attribute=nil, class_attribute=nil )
+    html = %{<ul id="#{id_attribute}" class="#{class_attribute}">\n}
+    simple_list.split("\n").each do |item|
+      html << '<li>' + item.to_s + '</li>' + "\n"
+    end
+    html << '</ul>'
+  end
+end
+
+begin
+  require 'erb'
+  require Dir.pwd + '/site_specs1606'
+  include Site_specs1606
+  include Make1606
+  # BASE_HREF = DOMAIN + '.jnj'
+  STYLESHEET = DOMAIN + '.css'
+  Site_specs1606::Page_list.each_key do |page_name|
+    write_to_disk( page_name.to_sym )
+  end
+  `mv ../public/member_area.html ../public/member_area/member_area.html`
+  `mv ../public/library.html ../public/member_area/library.html`
+  `mv ../public/newsletters.html ../public/member_area/newsletters.html`
+rescue Exception => e
+  puts e.message << "\n" << e.backtrace.first
+end

@@ -1,0 +1,134 @@
+#!/usr/bin/ruby
+module Make
+  def set_page(p)
+    @page_name = p
+  end
+  def get_page
+    @page_name
+  end
+  Template = <<-END_OF_TEMPLATE
+  <!DOCTYPE html>
+  <html lang="en-US">
+  <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <%= title %>
+  <%= description %>
+  <%= robots %>
+  <%= stylesheet %>
+  <%= responsive_menu_js %>
+  </head>
+  <body id="<%= get_page %>">
+  <%= body( get_page ) %>
+  </body>
+  </html>
+  END_OF_TEMPLATE
+  def content( filename = nil ) # Returns block of ERB'd html
+    if filename
+      fqfn = '../content/'  + filename.to_s + '.html'
+      if ! File.exist? fqfn
+        `touch #{fqfn}` # create a blank file if no file exists
+      end
+      ERB.new( File.read( fqfn ) ).result(binding)
+    else
+      raise 'File name argument was not passed to "content" method, or was nil'
+    end
+  end
+  def write_to_disk( p )
+    set_page( p )
+    template_to_use = Template unless template_to_use = Page_list[get_page][:T]
+    fqfn = '../public/' + p.to_s + '.html'
+    File.open( fqfn, 'w') do |fh|
+      fh.write( ERB.new( template_to_use ).result(binding) ) #####################
+      File.chmod( 0604, fqfn )
+    end
+  end
+  def title # Used in HEAD section
+    page_title = TITLE unless page_title = Page_list[get_page][:t]
+    %{<title>\n#{page_title}\n</title>\n}
+  end
+  def description # Used in HEAD section
+    page_description = DESCRIPTION unless page_description = Page_list[get_page][:d]
+    %{<meta name="description" content="#{ page_description }">}
+  end
+  def stylesheet # Used in HEAD section
+    %{<link rel = "stylesheet" type = "text/css" href = "css/#{ DOMAIN }.css">}
+  end
+  def robots # Used in HEAD section
+    %{<meta name="robots" content="index,follow">}
+  end
+  def aside
+    %{ <aside>\n#{content :aside}\n</aside>\n }
+  end
+  def header
+    %{<header>\n#{content :header}\n</header>\n}
+  end
+  def main( content )
+    %{ <main>\n#{ content }\n</main>\n }
+  end
+  def footer
+    %{ <footer>\n#{ content :footer }\n</footer>\n }
+  end
+  def nav
+    %{ <nav id="main_navigation">\n#{content :main_nav}\n</nav>\n }
+  end
+  def nav_links( navigation_hash )
+    links = ''
+    navigation_hash.each do |html_file, display_name|
+      links += %{<a href="#{html_file.to_s}.html">#{display_name}</a>\n}
+    end
+    links
+  end
+  def announce( content )
+    %{ <p class="announce1">\n#{content}\n</p>\n }
+  end
+  def photo( content )
+    %{ <img src="img/#{content}.jpg" class="#{content}">\n }
+  end
+  def masthead # The one and only Big Header for the page
+    %{ <header id="masthead">\n#{content :masthead}\n</header>\n }
+  end
+  def section( section_name ) #section/article name is a symbol
+    %{ <section id="#{section_name}">\n#{content section_name}\n</section>\n }
+  end
+  def article( article_name ) #section/article name is a symbol
+    %{ <article id="#{article_name}">\n#{content article_name}\n</article>\n }
+  end
+  def gallery( dir )
+    paragraph_set = ""
+    Dir.glob(%{../public/#{dir}*}).each do |file|
+      paragraph_set += %{<img src="#{dir}#{File.basename( file )}">}
+    end
+    paragraph_set
+  end
+  def ul( simple_list, id_attribute=nil, class_attribute=nil )
+    html = %{<ul id="#{id_attribute}" class="#{class_attribute}">\n}
+    simple_list.split("\n").each do |item|
+      html << '<li>' + item.to_s + '</li>' + "\n"
+    end
+    html << '</ul>'
+  end
+  def responsive_menu_js # Used in HEAD section
+    <<-End_of_script
+    <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript">
+      jQuery(function($){
+               $( '.menu_btn' ).click(function(){
+               $('.responsive_menu').toggleClass('expand')
+               })
+            })
+    </script>
+    End_of_script
+  end
+end
+
+begin
+  require 'erb'
+  require Dir.pwd + '/site_specs'; include Site_specs
+  include Make
+  Site_specs::Page_list.each_key do |page_name|
+    write_to_disk( page_name.to_sym )
+  end
+rescue Exception => e
+  puts e.message << "\n" << e.backtrace.first
+end
